@@ -1,3 +1,4 @@
+#Importing dependencies
 import pyautogui
 import time
 from PIL import Image, ImageEnhance
@@ -8,16 +9,20 @@ import openpyxl
 import shutil
 import csv
 from datetime import date
-ctypes.windll.user32.ShowWindow( ctypes.windll.kernel32.GetConsoleWindow(), 6 )
 from docx import Document
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt, Cm, Inches
 
+# Round Order toggle. Set to false to revert to alphabetical room order for list sorting
+# When set to true, list order starts with the higher floors and works its way down, with list order for 3B/4B reversed
 ROUND_ORDER = True
 
+# This command hides the window for the program when after it starts to not cover the Vista window
+ctypes.windll.user32.ShowWindow( ctypes.windll.kernel32.GetConsoleWindow(), 6 )
+
+# Workaround for common OCR errors when reading patient's rooms
 def roomClear(x):
-    print(x)
     x=x.replace("2-","2A-")
     x=x.replace("28-","2B-")
     x=x.replace("A0","A-0")
@@ -46,9 +51,13 @@ def roomClear(x):
     x=x.replace("-2A","-24")
     x=x.replace("-2B","-28")
     x=x.strip("-")
-    print(x)
+    x=x.replace("5LD-TX","BLD-TX")
+    x=x.replace("DAYCAS","DAYCASE")
     return x
 
+# Workaround for common OCR errors when reading patient's MRN
+# Known error: Sometimes the number '5' is read as '6'. This issue is unavoidable with current implementation.
+#              Possible fixes require image manipulation which will increase time for list generation significantly
 def mrnClear(x):
     x=x.strip().strip("\'\"|/\\").strip("\'\"|/\\‘°").replace(" ","")
     x=x.replace("i","1")
@@ -56,33 +65,35 @@ def mrnClear(x):
     x=x.replace("D","5")
     if not x or x.isspace(): return ""
     if x[0]=="0": x="5"+x
-    x=x.replace("5LD-TX","BLD-TX")
-    x=x.replace("DAYCAS","DAYCASE")
-    x=x.replace("217665","217565")
-    x=x.replace("165055","155055")
-    x=x.replace("243674","243574")
-    x=x.replace("164682","154682")
-    x=x.replace("243569","243559")
-    x=x.replace("247632","247532")
-    x=x.replace("167724","157724")
-    x=x.replace("165924","155924")
-    x=x.replace("169285","159285")
+
     return x
+
+# Given a patient, this function returns the floor the patient is on
 def getFloor(x):
     dash=x.room.find("-")
     if dash==-1: dash=2
     return x.room[0:dash]
+    
+# Given a patient, this function returns the room number the patient is in (without the floor)
 def getRoom(x):
     dash=x.room.find("-")
     if dash==-1: dash=2
     return x.room[dash:].strip("-")
 
+# Patient class definition. This class mostly functions as a data container and to facilitate list sorting.
 class Patient:
+    # Class constructor
     def __init__(self, name, room, mrn):
         self.name = name.replace(",,",",")
         self.room = room
         self.mrn = mrn
+    
+    # The "less than" comparator definition for this class. Python requires defining at least one comparision method for sorting objects.
+    # This function works by defining what the "<" operator returns  (i.e. when patient a (self)< patient b (obj) is true).
+    # Two sorting methods are presented based on the ROUND_ORDER value as defined above. Both methods require a special case for floors 10 and 11 
+    # as basic string comparison works one character at a time and both will be read as 1* (i.e. less than 2)
     def __lt__(self,obj):
+        # Rounding order sorting method
         if (ROUND_ORDER):
             if(self.room[0:2]=="11" and not obj.room[0:2]=="11"): return True
             if(not self.room[0:2]=="11" and obj.room[0:2]=="11"): return False
@@ -99,14 +110,15 @@ class Patient:
                 if(getFloor(self)[0:2]=="4B"): return getRoom(self)>getRoom(obj)
                 if(getFloor(self)[0:2]=="3B"): return getRoom(self)>getRoom(obj)
                 else:return getRoom(self)<getRoom(obj)
-
+        # Traditional sorting method
         else:
             if(self.room[0:2]=="11" and not obj.room[0:2]=="11"): return False
             if(not self.room[0:2]=="11" and obj.room[0:2]=="11"): return True
             if(self.room[0:2]=="10" and not obj.room[0:2]=="10"): return False
             if(not self.room[0:2]=="10" and obj.room[0:2]=="10"): return True
             return ((self.room) < (obj.room))
-  
+ 
+# Initialization for pyautogui (the input automation library) an pytesseract (the OCR library) 
 pyautogui.FAILSAFE = True
 pytesseract.pytesseract.tesseract_cmd=r'C:\Users\Oa.16675\AppData\Local\Programs\Tesseract-OCR\tesseract.exe'
 cancelTop=pyautogui.locateOnScreen("cancel.png").top
@@ -238,6 +250,7 @@ style = document.styles['No Spacing']
 font = style.font
 font.name = 'Calibri'
 font.size = Pt(16)
+font.bold = True
 normalstyle = document.styles['Normal']
 normalstyle.font.name = 'Calibri'
 
