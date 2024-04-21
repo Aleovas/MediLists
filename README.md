@@ -12,3 +12,8 @@ This is a simple python script to allow for automatic list generations of CPRS e
 
 # Known bugs
 - Currently only supports a font size of 12, this is being worked on
+
+# Installation instructions
+- Install [python](https://www.python.org/downloads/) and [tesseract](https://github.com/UB-Mannheim/tesseract/wiki) 
+- Install requirements from requirements.txt using pip
+- Run records.py
