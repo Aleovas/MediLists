@@ -61,6 +61,9 @@ def roomClear(x):
     x=x.replace("5LD-TX","BLD-TX")
     x=x.replace("DAYCAS","DAYCASE")
     x=x.replace("DC-KSBi","DC-KSB")
+    x=x.replace("3-","3A-")
+    x=x.replace("4-","4A-")
+    x=x.replace("5-","5C-")
     return x
 
 # Workaround for common OCR errors when reading patient's MRN
@@ -71,6 +74,7 @@ def mrnClear(x):
     x=x.replace("i","1")
     x=x.replace("o","9")
     x=x.replace("D","5")
+    x=x.replace("?","7")
     if not x or x.isspace(): return ""
     if x[0]=="0": x="5"+x
     x=x.strip("!")
@@ -87,6 +91,10 @@ def getRoom(x):
     dash=x.room.find("-")
     if dash==-1: dash=2
     return x.room[dash:].strip("-")
+
+# Adjusts offsets for screenshots based on font size
+def normalize(x):
+    return int(x*int(FONT_SIZE)/12)
 
 # Patient class definition. This class mostly functions as a data container and to facilitate list sorting.
 class Patient:
@@ -157,6 +165,9 @@ teams={
 # If patient is still ultimately not found it tells the user to manually locate it
 time.sleep(1)
 scrollbox=pyautogui.locateOnScreen(fr"Data\{FONT_SIZE}\patientScroll.png") # The scroll bar for patient list
+# Specifies an area to look for data relative to the cancel button (for optimization)
+cancel=pyautogui.locateOnScreen(fr"Data\{FONT_SIZE}\cancel.png")
+searchregion=(cancel.left-600,cancel.top,700,400)
 for team in teams.items():
     found = False
     while not found:
@@ -175,13 +186,21 @@ for team in teams.items():
     # Clicks on the first patient in the list. Location is relative to the scroll bar 
     pyautogui.click(scrollbox.left-300,scrollbox.top+5)
     pal=False
+    time.sleep(0.8)
+    # Finds region for screenshot of patient data in vista
+    ssn=pyautogui.locateOnScreen(fr"Data\{FONT_SIZE}\ssn.png", region=searchregion)
+    nameRegion=(ssn.left,ssn.top-normalize(20),normalize(400),normalize(20))
+    khcc=pyautogui.locateOnScreen(fr"Data\{FONT_SIZE}\khccroom.png", region=searchregion)
+    roomRegion=(khcc.left,khcc.top+normalize(20),normalize(75),normalize(20))
+    mrn=pyautogui.locateOnScreen(fr"Data\{FONT_SIZE}\mrn.png", region=searchregion)
+    mrnRegion=(mrn.left+normalize(45),mrn.top,normalize(65),normalize(20))
     # This assumes a maximum of 40 patients per team
-    for i in range(40):
+    for i in range(4):
         time.sleep(0.8)
-        # Takes screenshots of name, MRN, and room and uses tesseract 
-        nameImage=pyautogui.screenshot(r'1.png', region=(cancelLeft-409,cancelTop+45,392,20))
-        roomImage=ImageEnhance.Contrast(pyautogui.screenshot(r'3.png', region=(cancelLeft-195,cancelTop+152,74,36))).enhance(20)
-        mrnImage=ImageEnhance.Contrast(pyautogui.screenshot(r'2.png', region=(cancelLeft,cancelTop+80,68,27))).enhance(20)
+        # Takes screenshots of name, MRN, and room and uses tesseract for OCR
+        nameImage=pyautogui.screenshot(r'1.png', region=nameRegion)
+        roomImage=ImageEnhance.Contrast(pyautogui.screenshot(r'3.png', region=roomRegion)).enhance(20)
+        mrnImage=ImageEnhance.Contrast(pyautogui.screenshot(r'2.png', region=mrnRegion)).enhance(20)
         name=pytesseract.image_to_string(nameImage).strip().replace(".",",").replace("_",",").replace("|","").strip("\'\"|/\\").strip("\'\"|/\\")
         if not name or name.isspace(): 
             # Moving to next list if it reaches an empty name (i.e. end of list)
