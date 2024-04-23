@@ -78,6 +78,8 @@ def mrnClear(x):
     if not x or x.isspace(): return ""
     if x[0]=="0": x="5"+x
     x=x.strip("!")
+    if x[0]=="T": x="1"+x[1:]
+    if len(x)==7: x="2"+x[2:]
     return x
 
 # Given a patient, this function returns the floor the patient is on
