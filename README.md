@@ -4,6 +4,7 @@ This is a simple python script to allow for automatic list generations of CPRS e
 # Current implemented features
 - Automatically finding team lists and patients
 - Creating excel sheets with team counts and lists
+- Comparision with previous excel file, if present, to allow for statistics regarding admissions and discharges/transfers
 - Creating word documents with lists for easier printing
 
 # Planned features
