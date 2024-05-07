@@ -76,6 +76,7 @@ def roomClear(x):
     x=x.replace("5-","5C-")
     x=x.replace("QH","9H")
     x=x.replace("A2","A-2")
+    x=x.replace("0-","C-")
     print(x)
     return x
 
@@ -270,21 +271,10 @@ if os.path.isfile(yesterdayExcel):
         r=2
         while True:
             mrn=teamSheet.cell(row=r,column=4).value
-            if not mrn or mrn.isspace(): break
+            if not mrn or str(mrn).isspace(): break
             team[1].append(teamSheet.cell(row=r,column=4).value)           
             r+=1
             
-    for team in teams.items():
-        if team[0]=="Team 4": continue
-        for patient in team[1][0]:
-            if patient.mrn not in yesterdayTeams[team[0]]:
-                patient.new=True
-                team[1][3][0] += 1 # Updates new patient counter for the team
-        mrnsToday=[x.mrn for x in team[1][0]]
-        for patient in yesterdayTeams[team[0]]: # Updates missing patient counter
-            if patient not in mrnsToday: team[1][3][1] += 1
-        print(f'New/Old: {team[1][3][0]}/{team[1][3][1]}')
-
 # Copies the template excel file to new file named after today's date
 # Then it gets the team counts sheet and finds the relavent teams
 excelName= f'{date.today()}.xlsx'
@@ -317,8 +307,24 @@ for team in teams.items():
         if patient.room[0:2] in ignoredFloors:
             remove.append(patient)
     for patient in remove:
-        team[1][0].remove(patient)
+        try:team[1][0].remove(patient)
+        except: 
+            print(str(patient))
     team[1][0].sort()
+    
+# If yesterday's excel file is present it counts missing and new patients for each team
+if YESTERDAY_PRESENT:
+    for team in teams.items():
+        if team[0]=="Team 4": continue
+        for patient in team[1][0]:
+            if patient.mrn not in yesterdayTeams[team[0]]:
+                patient.new=True
+                team[1][3][0] += 1 # Updates new patient counter for the team
+        mrnsToday=[x.mrn for x in team[1][0]]
+        for patient in yesterdayTeams[team[0]]: # Updates missing patient counter
+            if patient not in mrnsToday: team[1][3][1] += 1
+        print(f'New/Old: {team[1][3][0]}/{team[1][3][1]}')
+
     
 # Counting patients, updating team counts, and adding them to team list in excel        
 for team in teams.items():
@@ -402,7 +408,7 @@ for team in teams.items():
         # Adds shading if its a new patient
         if patient.new: 
             for cell in table.rows[i].cells:
-                shading_elm = parse_xml(r'<w:shd {} w:fill="D9D9D9"/>'.format(nsdecls('w')))
+                shading_elm = parse_xml(r'<w:shd {} w:fill="E9E9E9"/>'.format(nsdecls('w')))
                 cell._tc.get_or_add_tcPr().append(shading_elm)
         i+=1
     if team[0]!="Palliative": document.add_page_break()   
@@ -415,3 +421,4 @@ while True:
         break
     except:
         pyautogui.alert(text='Please close Word file and press OK', title='File write error', button='OK')    
+
