@@ -310,7 +310,6 @@ for team in teams.items():
         try:team[1][0].remove(patient)
         except: 
             print(str(patient))
-    team[1][0].sort()
     
 # If yesterday's excel file is present it counts missing and new patients for each team
 if YESTERDAY_PRESENT:
@@ -328,6 +327,7 @@ if YESTERDAY_PRESENT:
     
 # Counting patients, updating team counts, and adding them to team list in excel        
 for team in teams.items():
+    team[1][0].sort()
     for patient in team[1][0]:
         # If patient's room isn't in floors 2-5, adds them to the towers count 
         # which acts as a catch-all for other patiens (Daycase, IV unit, etc.)
@@ -368,6 +368,61 @@ while True:
     except:
         pyautogui.alert(text='Please close Excel file and press OK', title='File write error', button='OK')
         
+# Getting the personal lists list 
+personal={}
+with open('personal.csv') as personalCSV:
+    csv_reader = csv.DictReader(personalCSV)
+    for row in csv_reader:
+        print(row)
+        personal[row["name"]]=(row["vista_title"],[])
+pyautogui.click(pyautogui.locateCenterOnScreen(fr"Data\{FONT_SIZE}\personal.png"))
+time.sleep(0.8)
+for team in personal.items():
+    box=pyautogui.locateOnScreen(fr"Data\{FONT_SIZE}\teamSearchbar.png")
+    pyautogui.click(box.left,box.top)
+    pyautogui.typewrite(team[1][0])
+    time.sleep(0.5)
+    pyautogui.click(scrollbox.left-250,scrollbox.top+5)
+    time.sleep(0.5)
+    ssn=pyautogui.locateOnScreen(fr"Data\{FONT_SIZE}\ssn.png", region=searchregion)
+    nameRegion=(ssn.left,ssn.top-normalize(20),normalize(400),normalize(20))
+    khcc=pyautogui.locateOnScreen(fr"Data\{FONT_SIZE}\khccroom.png", region=searchregion)
+    roomRegion=(khcc.left,khcc.top+normalize(20),normalize(75),normalize(20))
+    mrn=pyautogui.locateOnScreen(fr"Data\{FONT_SIZE}\mrn.png", region=searchregion)
+    mrnRegion=(mrn.left+normalize(45),mrn.top,normalize(65),normalize(20))
+    # This assumes a maximum of 45 patients per team
+    for i in range(45):
+        time.sleep(0.8)
+        # Takes screenshots of name, MRN, and room and uses tesseract for OCR
+        nameImage=pyautogui.screenshot(r'1.png', region=nameRegion)
+        roomImage=ImageEnhance.Contrast(pyautogui.screenshot(r'3.png', region=roomRegion)).enhance(20)
+        mrnImage=ImageEnhance.Contrast(pyautogui.screenshot(r'2.png', region=mrnRegion)).enhance(20)
+        name=pytesseract.image_to_string(nameImage).strip().replace(".",",").replace("_",",").replace("|","").strip("\'\"|/\\").strip("\'\"|/\\")
+        if not name or name.isspace(): 
+            # Moving to next list if it reaches an empty name (i.e. end of list)
+            # Below is special code to account for palliative being split into two lists 
+            if pal: break
+            if(team[1][1]==fr"Data\{FONT_SIZE}\teampal1.png"):
+                box=pyautogui.locateOnScreen(fr"Data\{FONT_SIZE}\teampal2.png")
+                pyautogui.click(box.left,box.top)
+                time.sleep(1)
+                pyautogui.click(scrollbox.left-300,scrollbox.top+5)
+                pal=True
+                continue
+            break
+        mrn=mrnClear(pytesseract.image_to_string(mrnImage, config="--psm 7"))        
+        roomstr=pytesseract.image_to_string(roomImage, lang="eng", config="--psm 7").strip().strip("\'\"|/\\,.").strip("\'\"|/\\").strip()
+        # Code for skipping fake patients
+        if not mrn or mrn.isspace() or "Test" in name or "Pacs" in name or not roomstr or len(roomstr)<=2:
+            pyautogui.press('down')
+            continue
+        room=roomClear(roomstr)
+        # Creating a new patient with the collected information, 
+        # then pressing the down button to get next patient
+        team[1][1].append(Patient(name,room,mrn))
+        pyautogui.press('down')
+    team[1][1].sort()
+
 # Creates new word document and sets some style formatting
 document = Document()
 style = document.styles['No Spacing']
@@ -412,7 +467,36 @@ for team in teams.items():
                 cell._tc.get_or_add_tcPr().append(shading_elm)
         i+=1
     if team[0]!="Palliative": document.add_page_break()   
-
+for team in personal.items():
+    document.add_page_break()
+    title=document.add_paragraph(f'{team[0]} ({date.today()})')
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    title.style = style
+    row_number=len(team[1][1])+1
+    row_height=int(Inches(8.4)/row_number)
+    table=document.add_table(rows=row_number, cols=4)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.style = 'Table Grid'
+    table.rows[0].cells[3].text="MRN"
+    table.rows[0].cells[2].text="Room"
+    table.rows[0].cells[1].text="Name"
+    i=1
+    for patient in team[1][1]:
+        table.rows[i].height=row_height
+        table.rows[i].cells[3].text=patient.mrn
+        table.rows[i].cells[3].width=0
+        table.rows[i].cells[2].text=patient.room
+        table.rows[i].cells[2].width=0
+        table.rows[i].cells[1].text=patient.name 
+        table.rows[i].cells[1].width=Cm(50)
+        table.rows[i].cells[0].text=str(i) +("*" if patient.new else "")
+        table.rows[i].cells[0].width=0
+        # Adds shading if its a new patient
+        if patient.new: 
+            for cell in table.rows[i].cells:
+                shading_elm = parse_xml(r'<w:shd {} w:fill="E9E9E9"/>'.format(nsdecls('w')))
+                cell._tc.get_or_add_tcPr().append(shading_elm)
+        i+=1
 # Saves the word file. If an error occurs (Usually because word file is already open)
 # it prompts the user to close it
 while True:
