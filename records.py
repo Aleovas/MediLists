@@ -61,6 +61,7 @@ def roomClear(x):
     if x[-1]=="8": x=x[:-1]+"B"
     x=x.replace("3H","9H")
     x=x.replace("AA","A")
+    x=x.replace("5H","8H")
     x=x.replace("-A","-4")
     x=x.replace("-O","-0")
     x=x.replace("-2A","-24")
@@ -77,6 +78,11 @@ def roomClear(x):
     x=x.replace("QH","9H")
     x=x.replace("A2","A-2")
     x=x.replace("0-","C-")
+    x=x.replace("T1","11")
+    x=x.replace("1O","10")
+    x=x.replace("TO","10")
+    x=x.replace("1H-0","1H-")
+    x=x.replace("0H-0","0H-")
     print(x)
     return x
 
@@ -90,6 +96,7 @@ def mrnClear(x):
     x=x.replace("o","9")
     x=x.replace("D","5")
     x=x.replace("?","7")
+    x=x.replace("S","8")
     if not x or x.isspace(): return ""
     if x[0]=="0": x="5"+x
     x=x.strip("!")
@@ -100,6 +107,7 @@ def mrnClear(x):
 
 # Given a patient, this function returns the floor the patient is on
 def getFloor(x):
+    if(x.room[0:2]=="ER"):return "00"
     dash=x.room.find("-")
     if dash==-1: dash=2
     return x.room[0:dash]
@@ -130,11 +138,13 @@ class Patient:
     def __lt__(self,obj):
         # Rounding order sorting method
         if (ROUND_ORDER):
+            if(not self.room.isnumeric() and obj.room.isnumeric()): return False
             if(self.room[0:2]=="11" and not obj.room[0:2]=="11"): return True
             if(not self.room[0:2]=="11" and obj.room[0:2]=="11"): return False
             if(self.room[0:2]=="10" and not obj.room[0:2]=="10"): return True
             if(not self.room[0:2]=="10" and obj.room[0:2]=="10"): return False
             if(getFloor(self)[0]==getFloor(obj)[0]):
+                if(getFloor(self)[1]=="C" and not getFloor(obj)[1]=="C"): return True
                 if(getFloor(self)[1]=="C" and not getFloor(obj)[1]=="C"): return True
                 if(not getFloor(self)[1]=="C" and getFloor(obj)[1]=="C"): return False
                 if(getFloor(self)[1]=="B" and getFloor(obj)[1]=="A"): return False
@@ -157,9 +167,7 @@ class Patient:
 pyautogui.FAILSAFE = True
 pytesseract.pytesseract.tesseract_cmd=fr'C:\Users\{USER}\AppData\Local\Programs\Tesseract-OCR\tesseract.exe'
 
-# Using screenshots to find the "Cancel" and "Specialties" buttons
-cancelTop=pyautogui.locateOnScreen(fr"Data\{FONT_SIZE}\cancel.png").top
-cancelLeft=pyautogui.locateOnScreen(fr"Data\{FONT_SIZE}\cancel.png").left
+# Using screenshots to find the "Specialties" buttons
 try:
     spec=pyautogui.locateOnScreen(fr"Data\{FONT_SIZE}\spec.png")
     pyautogui.click(spec.left,spec.top)
@@ -306,6 +314,7 @@ for team in teams.items():
             remove.append(patient)
         if patient.room[0:2] in ignoredFloors:
             remove.append(patient)
+        if "PICU" in patient.room: remove.append(patient)
     for patient in remove:
         try:team[1][0].remove(patient)
         except: 
@@ -489,7 +498,7 @@ for team in personal.items():
         table.rows[i].cells[2].width=0
         table.rows[i].cells[1].text=patient.name 
         table.rows[i].cells[1].width=Cm(50)
-        table.rows[i].cells[0].text=str(i) +("*" if patient.new else "")
+        table.rows[i].cells[0].text=str(i) +("+" if patient.new else "")
         table.rows[i].cells[0].width=0
         # Adds shading if its a new patient
         if patient.new: 
